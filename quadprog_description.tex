@@ -1,0 +1,65 @@
+\documentclass[a4paper,10pt]{article}
+%\documentclass[a4paper,10pt]{scrartcl}
+
+\usepackage[utf8x]{inputenc}
+\usepackage{amsmath}
+
+\newcommand{\VersionNum}{Version 1.0}
+
+\title{SVM Matlab Implementation \VersionNum}
+\author{James Lyons}
+\date{13th Jan 2014}
+
+\pdfinfo{%
+  /Title    (SVM Matlab Implementation \VersionNum)
+  /Author   (James Lyons)
+  /Creator  (James Lyons)
+}
+
+\begin{document}
+\maketitle
+
+This document will refer to Alok's handwritten derivation. There may still be inaccuracies, I'll hopefully fix these in time. This is \VersionNum. Higher version numbers should mean more things are fixed.
+
+The basic problem we have for SVM is to find a value of $\alpha$ that maximises the following function:
+
+\begin{equation}\label{eq1} L(H,\alpha) = -\dfrac{1}{2}\alpha^T H \alpha + \alpha^T u \end{equation}
+
+where $u$ is a vector of ones the same length as $\alpha$, and $H$ is a square symmetric matrix defined as follows:
+\[ H_{ij} = y_i y_j x_i \cdotp x_j \]
+where $x_i$ is an input feature vector and $y_i \in \left\{0,1\right\}$ is the class label corresponding to $x_i$.
+
+MATLAB provides a function \texttt{quadprog} that \textit{minimises} the following function:
+\begin{equation}\label{eq2} L(H,g,\alpha) = \dfrac{1}{2}\alpha^T H \alpha + \alpha^T g \end{equation}
+
+According to the constraints $A\alpha \leq b$, $K\alpha = d$ and $e_i \leq \alpha_i \leq f_i$.
+
+The inputs to the function are \texttt{H}, \texttt{g}, the matrices \texttt{A} and \texttt{K} and the vectors \texttt{b}, \texttt{d}, \texttt{e} and \texttt{f}.
+
+To use it we just create all the right variables and plug them in. The first thing to notice is that \texttt{quadprog} \textit{minimises} eq \ref{eq2}, while we want to 
+\textit{maximise} eq \ref{eq1}, so we have to negate eq \ref{eq1}. There is also a negative sign out the front of eq \ref{eq1}, so we should absorb that into $H$.
+
+Our constraints are that $y^t\alpha = 0$ and $\alpha_i \geq 0$. To get these we set \texttt{A} to be the negative identity matrix, and \texttt{b} to zero so we have
+$-I\alpha \leq 0$, which ensures all alphas are greater than 0. For the equality constraint we set $K = y$ and $d=0$. Note that \texttt{K} does not have to be a full matrix, we only
+specify the top row. 
+
+At this point we have satisfied all the constraints we need and should be able to run the program, unfortunately it usually just returns with $\alpha = [\infty,\ldots,\infty]$. By adding
+some extra constraints (Using vectors \texttt{e} and \texttt{f} above) we can get it to converge all the time on a useful result and at the same time make it possible to handle the non-separable case.
+
+It turns out that to make SVM work in non-separable cases we just need to bound $\alpha$ i.e. $0 \leq \alpha_i \leq C$ where $C$ is the cost parameter. The final call to \texttt{quadprog} looks like this:
+\begin{verbatim}
+quadprog(H, g,          A,       b,          K, d, e,          f)
+quadprog(H, -ones(N,1), -eye(N), zeros(N,1), y, 0, zeros(N,1), C*ones(N,1))
+\end{verbatim}
+
+\section{Other things}
+Once alpha is computed it is trivial to compute the weights and bias and do classification. I think it should be possible to append a 1 to the input feature vectors and set the bias to 0.
+This will mean the bias is implicitly computed during the optimisation procedure. 
+
+Also, matlab's quadprog is very slow, with 2000 2-dimensional points it can take 15 minutes to compute alpha, while with 100 points it takes less than a second. So it does not scale 
+nicely.
+
+It should be fairly easy to change this implementation, as long as we can get the objective function to look something like eq \ref{2}. 
+
+
+\end{document}
